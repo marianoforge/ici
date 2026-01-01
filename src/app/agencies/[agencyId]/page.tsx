@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { calculateICI, type ReviewData } from "@/lib/scoring/agency-score";
 import Link from "next/link";
-import type { ReviewProjection } from "@prisma/client";
 
 interface PageProps {
   params: Promise<{ agencyId: string }>;
@@ -45,7 +44,7 @@ export default async function AgencyPage({ params }: PageProps) {
   }
 
   // Calcular ICI
-  const reviewsData: ReviewData[] = agency.reviews.map((review: ReviewProjection) => ({
+  const reviewsData: ReviewData[] = agency.reviews.map((review) => ({
     overallRating: review.overallRating,
     positivesOverall: review.positivesOverall || 0,
     severityPoints: review.severityPoints,
