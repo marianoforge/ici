@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Agency {
+  id           String   @id @default(cuid())
+  name         String
+  branchName   String?
+  website      String?
+  googlePlaceId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reviews      ReviewProjection[]
+  events       ReviewEvent[]
+
+  @@index([name])
+}
+
+model ReviewEvent {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+
+  // event identity
+  eventType     String
+  reviewId      String
+  agencyId      String
+
+  // canonical payload (store string to preserve canonicalization)
+  payloadJson   String
+
+  // hash chain
+  prevHash      String?
+  eventHash     String   @unique
+  signature     String?  // optional (KMS later)
+
+  // anchoring
+  anchorDate    DateTime?
+
+  agency        Agency   @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([reviewId, createdAt])
+}
+
+model ReviewProjection {
+  reviewId            String  @id
+  agencyId            String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // main fields
+  overallRating       Int      // 1..5
+  comment             String
+  province            String
+  city                String
+  neighborhood        String?
+  operationType       String   // BUY/SELL/RENT
+
+  // derived
+  positivesOverall    Float?
+  severityPoints      Int      @default(0)
+  isVerifiedOperation Boolean  @default(false)
+
+  // moderation
+  status              String   @default("VISIBLE") // VISIBLE/HIDDEN
+
+  agency              Agency   @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, createdAt])
+  @@index([province, city, neighborhood])
+}

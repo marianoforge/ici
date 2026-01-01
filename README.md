@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📊 Índice de Confianza Inmobiliaria (ICI)
 
-## Getting Started
+Sistema de valoración y confianza para inmobiliarias basado en experiencias reales.
 
-First, run the development server:
+## 🚀 Inicio Rápido
+
+### Requisitos
+
+- Node.js 18+
+- Docker (para PostgreSQL)
+- Yarn
+
+### Instalación
 
 ```bash
-npm run dev
-# or
+# Instalar dependencias
+yarn install
+
+# Levantar base de datos
+docker compose up -d
+
+# Ejecutar migraciones
+npx prisma migrate dev
+
+# Generar Prisma Client
+npx prisma generate
+
+# Iniciar servidor de desarrollo
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La aplicación estará disponible en [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🎯 Características
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### ✅ Implementado
 
-## Learn More
+- **Formulario de valoración completo**
+  - Identificación de inmobiliaria y operación
+  - Puntaje general (1-5 estrellas)
+  - Evaluación estructurada (checklist)
+  - Comentarios detallados
+  - Verificación opcional
 
-To learn more about Next.js, take a look at the following resources:
+- **Cálculo robusto del ICI**
+  - Rating bayesiano (no es un simple promedio)
+  - Factores de verificación, recencia y estabilidad
+  - Penalizaciones por incidentes graves
+  - Nivel de evidencia (A/B/C/D)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Event Sourcing**
+  - Canonical JSON + SHA-256
+  - Cadena de hashes inmutable
+  - Proyecciones para queries rápidas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **UI Moderna**
+  - Diseño limpio y accesible
+  - Responsive
+  - Tailwind CSS
 
-## Deploy on Vercel
+## 📐 Cómo funciona el ICI
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El ICI no es un simple promedio de estrellas. Utiliza:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Rating Bayesiano**: Considera la cantidad de reseñas para evitar que pocas valoraciones extremas distorsionen el puntaje
+2. **Factores multiplicadores**:
+   - Verificación: +15% si hay documentación
+   - Recencia: Más peso a valoraciones recientes
+   - Estabilidad: Penaliza variabilidad extrema
+3. **Penalizaciones**: Incidentes graves reducen el puntaje
+4. **Nivel de evidencia**: Indica qué tan confiable es el puntaje
+
+### Fórmula
+
+```
+BayesRating = (n/(n+m))*R + (m/(n+m))*C
+
+Donde:
+- n = cantidad de reseñas
+- m = prior (20)
+- R = promedio interno
+- C = promedio del mercado (3.8)
+
+ICI = InternalScore × Factores - Penalizaciones
+Rango: 0-100
+```
+
+## 🗂️ Estructura del Proyecto
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── reviews/route.ts          # POST/GET reviews
+│   │   └── agencies/[id]/score/      # GET ICI score
+│   ├── agencies/[id]/page.tsx        # Vista de agencia
+│   └── page.tsx                      # Formulario principal
+├── components/
+│   └── review-form.tsx               # Formulario de valoración
+├── lib/
+│   ├── canonical-json.ts             # Canonicalización
+│   ├── hash.ts                       # SHA-256
+│   ├── prisma.ts                     # Singleton de Prisma
+│   ├── review-derived.ts             # Campos calculados
+│   └── scoring/
+│       └── agency-score.ts           # Cálculo del ICI
+└── schemas/
+    └── review.ts                     # Validación con Zod
+```
+
+## 🔐 Seguridad y Trazabilidad
+
+Cada valoración:
+1. Se canonicaliza a JSON determinístico
+2. Se genera un hash SHA-256
+3. Se encadena con el hash anterior
+4. Se guarda como evento inmutable
+
+Esto permite:
+- Verificar integridad de los datos
+- Auditar cambios
+- Prevenir manipulación
+
+## 📊 Base de Datos
+
+### Modelos principales
+
+- **Agency**: Inmobiliarias
+- **ReviewEvent**: Eventos inmutables (event sourcing)
+- **ReviewProjection**: Vista materializada para queries
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests (cuando estén implementados)
+yarn test
+```
+
+## 📝 Próximos pasos
+
+- [ ] Búsqueda de inmobiliarias
+- [ ] Ranking de inmobiliarias
+- [ ] Upload de documentos para verificación
+- [ ] Moderación de contenido
+- [ ] API pública
+- [ ] Tests unitarios y de integración
+- [ ] Firma digital de eventos (KMS)
+
+## 🤝 Contribuir
+
+Este es un POC. Las contribuciones son bienvenidas.
+
+## 📄 Licencia
+
+MIT
