@@ -13,11 +13,22 @@ const globalForPrisma = globalThis as unknown as {
   pool: pg.Pool | undefined;
 };
 
+// Obtener la connection string (Vercel puede usar nombres diferentes)
+const connectionString = 
+  process.env.POSTGRES_PRISMA_URL || 
+  process.env.POSTGRES_URL || 
+  process.env.DATABASE_URL;
+
+// Debug en desarrollo
+if (process.env.NODE_ENV === "development") {
+  console.log("🔌 Connecting to database:", connectionString?.substring(0, 30) + "...");
+}
+
 // Crear pool de conexiones de PostgreSQL
 const pool =
   globalForPrisma.pool ??
   new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
   });
 
 // Crear adapter de Prisma
