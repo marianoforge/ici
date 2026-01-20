@@ -1,8 +1,21 @@
 import Link from "next/link";
 import { HomeSearch } from "@/components/home-search";
 
+interface AgencyRanking {
+  id: string;
+  name: string;
+  province?: string | null;
+  city?: string | null;
+  neighborhood?: string | null;
+  totalReviews: number;
+  verifiedCount: number;
+  ici: number;
+  evidenceLevel: string;
+  iciAdjusted: number;
+}
+
 // Datos para el ranking - fetched server-side
-async function getRanking() {
+async function getRanking(): Promise<AgencyRanking[]> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const res = await fetch(`${baseUrl}/api/agencies/ranking?limit=50`, {
