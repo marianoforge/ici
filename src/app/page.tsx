@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { HomeSearch } from "@/components/home-search";
+import { prisma } from "@/lib/prisma";
+import { calculateICI, type ReviewData } from "@/lib/scoring/agency-score";
 
 interface AgencyRanking {
   id: string;
@@ -16,19 +18,60 @@ interface AgencyRanking {
 
 // Datos para el ranking - fetched server-side
 async function getRanking(): Promise<AgencyRanking[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
-    const res = await fetch(`${baseUrl}/api/agencies/ranking?limit=50`, {
-      cache: "no-store",
+    const agencies = await prisma.agency.findMany({
+      include: {
+        reviews: {
+          where: { status: "VISIBLE" },
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.agencies || [];
+
+    const withScore = agencies
+      .filter((a) => a.reviews.length > 0)
+      .map((agency) => {
+        const reviewsData: ReviewData[] = agency.reviews.map((r) => ({
+          overallRating: r.overallRating,
+          compositeRating: r.compositeRating ?? r.overallRating,
+          accompanimentScore: r.accompanimentScore ?? 3,
+          responseTimeScore: r.responseTimeScore ?? 3,
+          problemResolutionScore: r.problemResolutionScore ?? 3,
+          npsScore: r.npsScore ?? 5,
+          positivesOverall: r.positivesOverall ?? 0,
+          severityPoints: r.severityPoints,
+          isVerifiedOperation: r.isVerifiedOperation,
+          createdAt: r.createdAt,
+        }));
+
+        const result = calculateICI(reviewsData);
+
+        return {
+          id: agency.id,
+          name: agency.name,
+          province: agency.province,
+          city: agency.city,
+          neighborhood: agency.neighborhood,
+          totalReviews: agency.reviews.length,
+          verifiedCount: agency.reviews.filter((r) => r.isVerifiedOperation).length,
+          ici: result.ici,
+          evidenceLevel: result.evidenceLevel,
+          iciAdjusted: result.iciAdjusted,
+        };
+      });
+
+    withScore.sort((a, b) => b.iciAdjusted - a.iciAdjusted);
+
+    return withScore.slice(0, 50);
   } catch (error) {
     console.error("Error fetching ranking:", error);
     return [];
   }
 }
+
+// Marcar como dinámica para que siempre obtenga datos frescos
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage() {
   const agencies = await getRanking();
