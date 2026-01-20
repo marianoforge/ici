@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { ReviewFormSchema, type ReviewForm, type ChecklistValue, type OperationType } from "@/schemas/review";
 import { useRouter } from "next/navigation";
+import { AgencyAutocomplete, type AgencySuggestion } from "./agency-autocomplete";
 
 export function ReviewFormComponent() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedAgency, setSelectedAgency] = useState<AgencySuggestion | null>(null);
+  const [isCreatingNewAgency, setIsCreatingNewAgency] = useState(false);
   
   const [formData, setFormData] = useState<ReviewForm>({
     agencyName: "",
@@ -35,6 +38,32 @@ export function ReviewFormComponent() {
     documentUploaded: false,
   });
 
+  const handleAgencySelect = (agency: AgencySuggestion | null) => {
+    if (agency) {
+      // Inmobiliaria existente seleccionada - auto-rellenar campos
+      setSelectedAgency(agency);
+      setIsCreatingNewAgency(false);
+      setFormData({
+        ...formData,
+        agencyName: agency.name,
+        province: agency.province || "",
+        city: agency.city || "",
+        neighborhood: agency.neighborhood || "",
+      });
+    } else {
+      // "Crear nueva" seleccionado
+      setSelectedAgency(null);
+      setIsCreatingNewAgency(true);
+      // Mantener el nombre escrito, limpiar los demás campos
+      setFormData({
+        ...formData,
+        province: "",
+        city: "",
+        neighborhood: "",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -57,10 +86,38 @@ export function ReviewFormComponent() {
     }
 
     try {
+      let agencyId = selectedAgency?.id;
+
+      // Si está creando una nueva inmobiliaria, crearla primero
+      if (isCreatingNewAgency && !selectedAgency) {
+        const agencyResponse = await fetch("/api/agencies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.agencyName,
+            province: formData.province,
+            city: formData.city,
+            neighborhood: formData.neighborhood,
+          }),
+        });
+
+        if (!agencyResponse.ok) {
+          const error = await agencyResponse.json();
+          throw new Error(error.error || "Error al crear la inmobiliaria");
+        }
+
+        const agencyData = await agencyResponse.json();
+        agencyId = agencyData.agency.id;
+      }
+
+      // Crear la review
       const response = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          agencyId, // Enviar el ID en lugar del nombre
+        }),
       });
 
       if (!response.ok) {
@@ -203,48 +260,30 @@ export function ReviewFormComponent() {
           1. Identificación
         </h2>
         
+        {/* Autocomplete de inmobiliaria */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre de la inmobiliaria *
+            Nombre de la inmobiliaria y sucursal *
           </label>
-          <input
-            type="text"
+          <AgencyAutocomplete
             value={formData.agencyName}
-            onChange={(e) => setFormData({ ...formData, agencyName: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Ej: Inmobiliaria ABC"
+            onChange={(value) => setFormData({ ...formData, agencyName: value })}
+            onSelectAgency={handleAgencySelect}
+            error={errors.agencyName}
           />
-          {errors.agencyName && <p className="text-sm text-red-600 mt-1">{errors.agencyName}</p>}
+          {selectedAgency && (
+            <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+              <span>✓</span> Inmobiliaria existente seleccionada
+            </p>
+          )}
+          {isCreatingNewAgency && (
+            <p className="text-sm text-blue-600 mt-1 flex items-center gap-1">
+              <span>+</span> Se creará una nueva inmobiliaria
+            </p>
+          )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Sucursal (opcional)
-          </label>
-          <input
-            type="text"
-            value={formData.branchName}
-            onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Ej: Sucursal Centro"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tipo de operación *
-          </label>
-          <select
-            value={formData.operationType}
-            onChange={(e) => setFormData({ ...formData, operationType: e.target.value as OperationType })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="BUY">Compra</option>
-            <option value="SELL">Venta</option>
-            <option value="RENT">Alquiler</option>
-          </select>
-        </div>
-
+        {/* Ubicación */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -254,7 +293,10 @@ export function ReviewFormComponent() {
               type="text"
               value={formData.province}
               onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={selectedAgency !== null}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                selectedAgency !== null ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
               placeholder="Ej: Buenos Aires"
             />
             {errors.province && <p className="text-sm text-red-600 mt-1">{errors.province}</p>}
@@ -268,7 +310,10 @@ export function ReviewFormComponent() {
               type="text"
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={selectedAgency !== null}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                selectedAgency !== null ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
               placeholder="Ej: CABA"
             />
             {errors.city && <p className="text-sm text-red-600 mt-1">{errors.city}</p>}
@@ -282,10 +327,29 @@ export function ReviewFormComponent() {
               type="text"
               value={formData.neighborhood}
               onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={selectedAgency !== null}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                selectedAgency !== null ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
               placeholder="Ej: Palermo"
             />
           </div>
+        </div>
+
+        {/* Tipo de operación - movido al final */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tipo de operación *
+          </label>
+          <select
+            value={formData.operationType}
+            onChange={(e) => setFormData({ ...formData, operationType: e.target.value as OperationType })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="BUY">Compra</option>
+            <option value="SELL">Venta</option>
+            <option value="RENT">Alquiler</option>
+          </select>
         </div>
       </section>
 

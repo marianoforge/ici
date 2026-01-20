@@ -53,6 +53,11 @@ export default async function AgencyPage({ params }: PageProps) {
   // Calcular ICI
   const reviewsData: ReviewData[] = agency.reviews.map((review: Review) => ({
     overallRating: review.overallRating,
+    compositeRating: review.compositeRating || review.overallRating, // fallback para reviews antiguas
+    accompanimentScore: review.accompanimentScore || 3,
+    responseTimeScore: review.responseTimeScore || 3,
+    problemResolutionScore: review.problemResolutionScore || 3,
+    npsScore: review.npsScore || 5,
     positivesOverall: review.positivesOverall || 0,
     severityPoints: review.severityPoints,
     isVerifiedOperation: review.isVerifiedOperation,

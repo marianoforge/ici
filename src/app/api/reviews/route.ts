@@ -38,21 +38,39 @@ export async function POST(request: NextRequest) {
     
     const reviewData = validationResult.data;
     
-    // 2. Buscar o crear la agencia
-    let agency = await prisma.agency.findFirst({
-      where: {
-        name: reviewData.agencyName,
-        branchName: reviewData.branchName || null,
-      },
-    });
+    // 2. Obtener la agencia - puede venir con agencyId o buscar/crear por nombre
+    let agency;
     
-    if (!agency) {
-      agency = await prisma.agency.create({
-        data: {
+    if (body.agencyId) {
+      // Si viene el agencyId, usarlo directamente
+      agency = await prisma.agency.findUnique({
+        where: { id: body.agencyId },
+      });
+      
+      if (!agency) {
+        return NextResponse.json(
+          { error: "Inmobiliaria no encontrada" },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Flujo anterior: buscar o crear por nombre (retrocompatibilidad)
+      agency = await prisma.agency.findFirst({
+        where: {
           name: reviewData.agencyName,
-          branchName: reviewData.branchName,
         },
       });
+      
+      if (!agency) {
+        agency = await prisma.agency.create({
+          data: {
+            name: reviewData.agencyName,
+            province: reviewData.province,
+            city: reviewData.city,
+            neighborhood: reviewData.neighborhood,
+          },
+        });
+      }
     }
     
     // 3. Calcular campos derivados
