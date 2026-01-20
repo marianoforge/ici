@@ -47,10 +47,18 @@ export const ReviewFormSchema = z.object({
   moneyWithheld: ChecklistValueSchema,
   abusivePractices: ChecklistValueSchema,
 
-  // 4. Comentario
+  // 4. Experiencia de servicio (1-5)
+  accompanimentScore: z.number().int().min(1).max(5),
+  responseTimeScore: z.number().int().min(1).max(5),
+  problemResolutionScore: z.number().int().min(1).max(5),
+
+  // 5. Comentario
   comment: z.string().min(50, "El comentario debe tener al menos 50 caracteres"),
 
-  // 5. Verificación (opcional)
+  // 6. Recomendación - NPS (1-10)
+  npsScore: z.number().int().min(1).max(10),
+
+  // 7. Verificación (opcional)
   wantsVerification: z.boolean().default(false),
   documentUploaded: z.boolean().default(false),
 });
@@ -77,6 +85,10 @@ export const CanonicalReviewPayloadSchema = z.object({
   unduePressure: ChecklistValueSchema,
   moneyWithheld: ChecklistValueSchema,
   abusivePractices: ChecklistValueSchema,
+  accompanimentScore: z.number(),
+  responseTimeScore: z.number(),
+  problemResolutionScore: z.number(),
+  npsScore: z.number(),
   comment: z.string(),
   wantsVerification: z.boolean(),
   documentUploaded: z.boolean(),

@@ -3,6 +3,11 @@
  */
 export interface ReviewData {
   overallRating: number; // 1-5
+  compositeRating: number; // 1-5 (rating ponderado)
+  accompanimentScore: number; // 1-5
+  responseTimeScore: number; // 1-5
+  problemResolutionScore: number; // 1-5
+  npsScore: number; // 1-10
   positivesOverall: number; // 0-1
   severityPoints: number;
   isVerifiedOperation: boolean;
@@ -24,7 +29,10 @@ export interface ICIResult {
     verifyFactor: number;
     recencyFactor: number;
     stabilityFactor: number;
+    consistencyFactor: number;
     effectiveReviews: number;
+    avgCompositeRating: number;
+    avgNps: number;
   };
 }
 
@@ -49,11 +57,11 @@ const CONSTANTS = {
 };
 
 /**
- * Calcula el rating bayesiano
+ * Calcula el rating bayesiano usando el composite rating
  * 
  * BayesRating = (n/(n+m))*R + (m/(n+m))*C
  * 
- * - R: promedio interno
+ * - R: promedio interno (composite rating ponderado)
  * - n: cantidad de reseñas
  * - C: promedio del mercado (3.8)
  * - m: prior (20)
@@ -69,14 +77,51 @@ function calculateBayesianRating(
     return C;
   }
   
-  // Calcular promedio interno R
-  const sum = reviews.reduce((acc, r) => acc + r.overallRating, 0);
+  // Calcular promedio interno R usando composite rating
+  const sum = reviews.reduce((acc, r) => acc + r.compositeRating, 0);
   const R = sum / n;
   
   // Aplicar fórmula bayesiana
   const bayesRating = (n / (n + m)) * R + (m / (n + m)) * C;
   
   return bayesRating;
+}
+
+/**
+ * Calcula el promedio del NPS
+ */
+function calculateAverageNps(reviews: ReviewData[]): number {
+  if (reviews.length === 0) return 5;
+  const sum = reviews.reduce((acc, r) => acc + r.npsScore, 0);
+  return sum / reviews.length;
+}
+
+/**
+ * Calcula el factor de consistencia
+ * Detecta reviews donde hay discrepancia entre overall rating y NPS
+ * 
+ * Si alguien da 5 estrellas pero NPS de 2, hay inconsistencia
+ * Factor entre 0.85 y 1.0
+ */
+function calculateConsistencyFactor(reviews: ReviewData[]): number {
+  if (reviews.length === 0) return 1;
+  
+  const consistencyScores = reviews.map((r) => {
+    // Normalizar NPS (1-10) a escala 1-5
+    const npsNormalized = ((r.npsScore - 1) / 9) * 4 + 1;
+    
+    // Diferencia absoluta entre overall y NPS normalizado
+    const diff = Math.abs(r.overallRating - npsNormalized);
+    
+    // Máxima diferencia posible es 4 (1 vs 5)
+    // Convertir a score de consistencia (0-1, donde 1 es perfectamente consistente)
+    return 1 - (diff / 4);
+  });
+  
+  const avgConsistency = consistencyScores.reduce((acc, c) => acc + c, 0) / consistencyScores.length;
+  
+  // Factor entre 0.85 y 1.0
+  return 0.85 + avgConsistency * 0.15;
 }
 
 /**
@@ -121,12 +166,12 @@ function calculateRecencyFactor(reviews: ReviewData[]): number {
 }
 
 /**
- * Calcula el factor de estabilidad
+ * Calcula el factor de estabilidad usando composite rating
  */
 function calculateStabilityFactor(reviews: ReviewData[]): number {
   if (reviews.length < 2) return 1;
   
-  const ratings = reviews.map((r) => r.overallRating);
+  const ratings = reviews.map((r) => r.compositeRating);
   const mean = ratings.reduce((acc, r) => acc + r, 0) / ratings.length;
   
   const variance = ratings.reduce((acc, r) => acc + Math.pow(r - mean, 2), 0) / ratings.length;
@@ -181,11 +226,22 @@ function getEvidenceLevel(evidence: number): "A" | "B" | "C" | "D" {
 /**
  * Calcula el Índice de Confianza Inmobiliaria (ICI)
  * 
+ * Fórmula robusta:
+ * ICI = InternalScore × Factores - Penalizaciones
+ * 
+ * Donde InternalScore = Bayesian(CompositeRating) normalizado a 0-100
+ * 
+ * Factores:
+ * - Verificación: +15% si hay documentación
+ * - Recencia: Más peso a valoraciones recientes
+ * - Estabilidad: Penaliza variabilidad extrema
+ * - Consistencia: Penaliza discrepancias entre overall y NPS
+ * 
  * @param reviews - Array de reviews de la agencia
  * @returns Resultado del cálculo del ICI
  */
 export function calculateICI(reviews: ReviewData[]): ICIResult {
-  // 1. Rating bayesiano
+  // 1. Rating bayesiano (usando composite rating)
   const bayesianRating = calculateBayesianRating(reviews);
   
   // 2. Normalizar a 0-100
@@ -195,8 +251,9 @@ export function calculateICI(reviews: ReviewData[]): ICIResult {
   const verifyFactor = calculateVerifyFactor(reviews);
   const recencyFactor = calculateRecencyFactor(reviews);
   const stabilityFactor = calculateStabilityFactor(reviews);
+  const consistencyFactor = calculateConsistencyFactor(reviews);
   
-  internalScore = internalScore * verifyFactor * recencyFactor * stabilityFactor;
+  internalScore = internalScore * verifyFactor * recencyFactor * stabilityFactor * consistencyFactor;
   
   // 4. Calcular penalizaciones
   const incidentPenalty = calculateIncidentPenalty(reviews);
@@ -212,9 +269,13 @@ export function calculateICI(reviews: ReviewData[]): ICIResult {
   // 7. ICI ajustado para ranking
   const iciAdjusted = ici * (0.75 + 0.25 * evidence);
   
-  // 8. Reseñas efectivas
+  // 8. Métricas adicionales
   const verifiedCount = reviews.filter((r) => r.isVerifiedOperation).length;
   const effectiveReviews = reviews.length + CONSTANTS.VERIFIED_WEIGHT * verifiedCount;
+  const avgCompositeRating = reviews.length > 0
+    ? reviews.reduce((acc, r) => acc + r.compositeRating, 0) / reviews.length
+    : CONSTANTS.MARKET_AVERAGE;
+  const avgNps = calculateAverageNps(reviews);
   
   return {
     ici: Math.round(ici * 100) / 100,
@@ -228,7 +289,10 @@ export function calculateICI(reviews: ReviewData[]): ICIResult {
       verifyFactor: Math.round(verifyFactor * 100) / 100,
       recencyFactor: Math.round(recencyFactor * 100) / 100,
       stabilityFactor: Math.round(stabilityFactor * 100) / 100,
+      consistencyFactor: Math.round(consistencyFactor * 100) / 100,
       effectiveReviews: Math.round(effectiveReviews * 100) / 100,
+      avgCompositeRating: Math.round(avgCompositeRating * 100) / 100,
+      avgNps: Math.round(avgNps * 100) / 100,
     },
   };
 }

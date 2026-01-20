@@ -5,9 +5,23 @@ import type { ChecklistValue, ReviewForm } from "@/schemas/review";
  */
 export interface DerivedFields {
   positivesOverall: number;
+  compositeRating: number;
   severityPoints: number;
   isVerifiedOperation: boolean;
 }
+
+/**
+ * Pesos para el cálculo del rating compuesto
+ * Total = 1.0 (100%)
+ */
+const COMPOSITE_WEIGHTS = {
+  overallRating: 0.20,        // 20% - Puntaje general
+  accompanimentScore: 0.15,   // 15% - Acompañamiento y confianza
+  responseTimeScore: 0.15,    // 15% - Tiempo de respuesta
+  problemResolutionScore: 0.15, // 15% - Gestión y resolución
+  checklistScore: 0.20,       // 20% - Evaluación detallada (checklist)
+  npsScore: 0.15,             // 15% - NPS (recomendación)
+};
 
 /**
  * Convierte un valor del checklist a número
@@ -32,6 +46,22 @@ function calculateAverage(values: (number | null)[]): number | null {
   
   const sum = validValues.reduce((acc, val) => acc + val, 0);
   return sum / validValues.length;
+}
+
+/**
+ * Normaliza NPS (1-10) a escala 1-5 para el cálculo compuesto
+ */
+function normalizeNpsTo5(nps: number): number {
+  // 1-10 → 1-5: (nps - 1) / 9 * 4 + 1
+  return ((nps - 1) / 9) * 4 + 1;
+}
+
+/**
+ * Convierte positivesOverall (0-1) a escala 1-5
+ */
+function normalizePositivesTo5(positives: number): number {
+  // 0-1 → 1-5
+  return positives * 4 + 1;
 }
 
 /**
@@ -90,8 +120,22 @@ export function calculateDerivedFields(review: ReviewForm): DerivedFields {
     review.wantsVerification === true && 
     review.documentUploaded === true;
   
+  // 4. Calcular Composite Rating (ponderado, escala 1-5)
+  // Todos los valores se normalizan a escala 1-5 antes de ponderar
+  const checklistScore5 = normalizePositivesTo5(positivesOverall);
+  const npsScore5 = normalizeNpsTo5(review.npsScore);
+  
+  const compositeRating = 
+    COMPOSITE_WEIGHTS.overallRating * review.overallRating +
+    COMPOSITE_WEIGHTS.accompanimentScore * review.accompanimentScore +
+    COMPOSITE_WEIGHTS.responseTimeScore * review.responseTimeScore +
+    COMPOSITE_WEIGHTS.problemResolutionScore * review.problemResolutionScore +
+    COMPOSITE_WEIGHTS.checklistScore * checklistScore5 +
+    COMPOSITE_WEIGHTS.npsScore * npsScore5;
+  
   return {
     positivesOverall,
+    compositeRating,
     severityPoints,
     isVerifiedOperation,
   };

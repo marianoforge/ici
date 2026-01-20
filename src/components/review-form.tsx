@@ -26,6 +26,10 @@ export function ReviewFormComponent() {
     unduePressure: "NA",
     moneyWithheld: "NA",
     abusivePractices: "NA",
+    accompanimentScore: 3,
+    responseTimeScore: 3,
+    problemResolutionScore: 3,
+    npsScore: 5,
     comment: "",
     wantsVerification: false,
     documentUploaded: false,
@@ -113,6 +117,68 @@ export function ReviewFormComponent() {
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
+
+  const RatingScaleField = ({
+    label,
+    description,
+    name,
+    value,
+    onChange,
+    min = 1,
+    max = 5,
+    lowLabel,
+    highLabel,
+    error,
+  }: {
+    label: string;
+    description?: string;
+    name: string;
+    value: number;
+    onChange: (value: number) => void;
+    min?: number;
+    max?: number;
+    lowLabel?: string;
+    highLabel?: string;
+    error?: string;
+  }) => {
+    const options = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    
+    return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">{label}</label>
+          {description && (
+            <p className="text-sm text-gray-500 mt-1">{description}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-1 sm:gap-2">
+            {options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onChange(option)}
+                className={`flex-1 py-2 px-1 sm:px-3 rounded-lg border-2 transition-all text-sm sm:text-base ${
+                  value === option
+                    ? "border-blue-600 bg-blue-50 text-blue-900 font-semibold"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          {(lowLabel || highLabel) && (
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>{lowLabel}</span>
+              <span>{highLabel}</span>
+            </div>
+          )}
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
+    );
+  };
 
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-8 p-6">
@@ -329,10 +395,55 @@ export function ReviewFormComponent() {
         </div>
       </section>
 
-      {/* 4. Comentario */}
+      {/* 4. Experiencia de Servicio */}
+      <section className="space-y-6 p-6 bg-white rounded-lg border border-gray-200">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            4. Experiencia de Servicio
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Evalúa aspectos clave de la atención recibida
+          </p>
+        </div>
+
+        <RatingScaleField
+          label="Acompañamiento y confianza"
+          description="¿Qué tan acompañado/a y contenido/a te sentiste durante todo el proceso de la operación?"
+          name="accompanimentScore"
+          value={formData.accompanimentScore}
+          onChange={(value) => setFormData({ ...formData, accompanimentScore: value })}
+          lowLabel="Nada acompañado"
+          highLabel="Muy acompañado"
+          error={errors.accompanimentScore}
+        />
+
+        <RatingScaleField
+          label="Tiempo de respuesta"
+          description="Desde que te comunicaste con la inmobiliaria, ¿qué tan rápida fue su respuesta?"
+          name="responseTimeScore"
+          value={formData.responseTimeScore}
+          onChange={(value) => setFormData({ ...formData, responseTimeScore: value })}
+          lowLabel="Muy lento"
+          highLabel="Muy rápido"
+          error={errors.responseTimeScore}
+        />
+
+        <RatingScaleField
+          label="Gestión y resolución de situaciones"
+          description="Ante dudas, imprevistos o conflictos, ¿qué tan eficaz fue la inmobiliaria para resolverlos?"
+          name="problemResolutionScore"
+          value={formData.problemResolutionScore}
+          onChange={(value) => setFormData({ ...formData, problemResolutionScore: value })}
+          lowLabel="Nada eficaz"
+          highLabel="Muy eficaz"
+          error={errors.problemResolutionScore}
+        />
+      </section>
+
+      {/* 5. Comentario */}
       <section className="space-y-4 p-6 bg-white rounded-lg border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-900">
-          4. Comentario
+          5. Comentario
         </h2>
         
         <div>
@@ -355,10 +466,38 @@ export function ReviewFormComponent() {
         </div>
       </section>
 
-      {/* 5. Verificación */}
+      {/* 6. Recomendación (NPS) */}
+      <section className="space-y-4 p-6 bg-white rounded-lg border border-gray-200">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            6. Recomendación
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Tu opinión general sobre la inmobiliaria
+          </p>
+        </div>
+
+        <RatingScaleField
+          label="¿Qué tan probable es que recomiendes esta inmobiliaria?"
+          name="npsScore"
+          value={formData.npsScore}
+          onChange={(value) => setFormData({ ...formData, npsScore: value })}
+          min={1}
+          max={10}
+          lowLabel="Nada probable"
+          highLabel="Muy probable"
+          error={errors.npsScore}
+        />
+
+        <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+          <span className="font-medium">Guía:</span> 1-6 = No lo recomendaría, 7-8 = Neutral, 9-10 = Lo recomiendo
+        </div>
+      </section>
+
+      {/* 7. Verificación */}
       <section className="space-y-4 p-6 bg-white rounded-lg border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-900">
-          5. Verificación (Opcional)
+          7. Verificación (Opcional)
         </h2>
         <p className="text-sm text-gray-600">
           Las valoraciones verificadas tienen más peso en el cálculo del ICI

@@ -16,7 +16,7 @@ Sistema de valoración y confianza para inmobiliarias basado en experiencias rea
 # Instalar dependencias
 yarn install
 
-# Levantar base de datos
+# Levantar base de datosnvm 
 docker compose up -d
 
 # Ejecutar migraciones
@@ -60,28 +60,47 @@ La aplicación estará disponible en [http://localhost:3000](http://localhost:30
 
 ## 📐 Cómo funciona el ICI
 
-El ICI no es un simple promedio de estrellas. Utiliza:
+El ICI no es un simple promedio de estrellas. Utiliza un **Rating Compuesto Ponderado** con múltiples dimensiones:
+
+### Dimensiones evaluadas
+
+| Dimensión | Peso | Escala |
+|-----------|------|--------|
+| Puntaje general | 20% | 1-5 |
+| Acompañamiento y confianza | 15% | 1-5 |
+| Tiempo de respuesta | 15% | 1-5 |
+| Gestión y resolución | 15% | 1-5 |
+| Evaluación detallada (checklist) | 20% | 0-1 → 1-5 |
+| NPS (Recomendación) | 15% | 1-10 → 1-5 |
+
+### Factores multiplicadores
 
 1. **Rating Bayesiano**: Considera la cantidad de reseñas para evitar que pocas valoraciones extremas distorsionen el puntaje
-2. **Factores multiplicadores**:
-   - Verificación: +15% si hay documentación
-   - Recencia: Más peso a valoraciones recientes
-   - Estabilidad: Penaliza variabilidad extrema
-3. **Penalizaciones**: Incidentes graves reducen el puntaje
-4. **Nivel de evidencia**: Indica qué tan confiable es el puntaje
+2. **Verificación**: +15% si hay documentación
+3. **Recencia**: Más peso a valoraciones recientes
+4. **Estabilidad**: Penaliza variabilidad extrema
+5. **Consistencia**: Penaliza discrepancias entre puntaje general y NPS
+
+### Penalizaciones y evidencia
+
+- **Penalizaciones**: Incidentes graves (prácticas abusivas, retención de dinero) reducen el puntaje
+- **Nivel de evidencia**: A/B/C/D según cantidad y calidad de reseñas
 
 ### Fórmula
 
 ```
+CompositeRating = Σ (wi × scorei) / Σ wi   [escala 1-5]
+
 BayesRating = (n/(n+m))*R + (m/(n+m))*C
 
 Donde:
+- R = promedio de CompositeRating
 - n = cantidad de reseñas
 - m = prior (20)
-- R = promedio interno
 - C = promedio del mercado (3.8)
 
-ICI = InternalScore × Factores - Penalizaciones
+ICI = Normalize(BayesRating) × VerifyFactor × RecencyFactor × StabilityFactor × ConsistencyFactor - Penalizaciones
+
 Rango: 0-100
 ```
 

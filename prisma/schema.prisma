@@ -61,8 +61,17 @@ model ReviewProjection {
   neighborhood        String?
   operationType       String   // BUY/SELL/RENT
 
+  // service experience scores (1-5)
+  accompanimentScore      Int?     // Acompañamiento y confianza
+  responseTimeScore       Int?     // Tiempo de respuesta
+  problemResolutionScore  Int?     // Gestión y resolución de situaciones
+
+  // NPS (1-10)
+  npsScore            Int?     // Net Promoter Score
+
   // derived
   positivesOverall    Float?
+  compositeRating     Float?   // Rating compuesto ponderado
   severityPoints      Int      @default(0)
   isVerifiedOperation Boolean  @default(false)
 
